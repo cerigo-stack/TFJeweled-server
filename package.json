@@ -1,0 +1,14 @@
+{
+  "name": "tfj_server",
+  "version": "1.0.0",
+  "description": "TFJ server for matchmaking and games.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ceri",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+}
