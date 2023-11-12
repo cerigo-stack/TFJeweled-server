@@ -22,9 +22,14 @@ module.exports.getLobbyList = () =>
     return lobby_list
 }
 
-module.exports.getLobbyPlayers = (lobby_index) =>
+module.exports.getLobbyPlayersInfo = (lobby_index) =>
 {
-    return lobby_list[lobby_index].players.map(function(a) {return a.name;})
+    return lobby_list[lobby_index].players.map(function(a) {return a.name+"?"+a.ready;})
+}
+
+module.exports.getLobbyPlayersObject = (lobby_index) =>
+{
+    return lobby_list[lobby_index].players.map(function(a) {return a;})
 }
 
 module.exports.joinLobby = (player,req_lobby_name) =>
@@ -36,6 +41,7 @@ module.exports.joinLobby = (player,req_lobby_name) =>
             return lobby.addPlayer(player)
         }
     }
+    return false
 }
 
 module.exports.registerLobby = (name,host) =>
@@ -48,7 +54,7 @@ module.exports.generateLobbyList = () =>      //LBS|lobbyname?lobbyhost/lobbynam
     msg="LBS|"
     for (const lob of lobby_list)
     {
-        msg+=lob.name+"?"+lob.players[0]+"/"
+        msg+=lob.name+"?"+lob.players[0].name+"/"
     }
     msg=msg.slice(0,-1) //removes last /
     return msg
@@ -57,15 +63,12 @@ module.exports.generateLobbyList = () =>      //LBS|lobbyname?lobbyhost/lobbynam
 module.exports.disconnectPlayer = (player) =>
 {
     let {lobby_index,player_index} = module.exports.findPlayerLobby(player)
-    if (player_index==0) 
-    {
-        unregisterLobby(lobby_index)
-        return
-    }
     lobby_list[lobby_index].players.splice(player_index,1)
+    if (player_index==0) return true //if I was host
+    return false
 }
 
-unregisterLobby = (lobby_index) =>
+module.exports.unregisterLobby = (lobby_index) =>
 {
     lobby_list.splice(lobby_index,1)
 }
@@ -82,4 +85,5 @@ module.exports.findPlayerLobby = (player_given) =>
             }
         }
     }
+    return {"lobby_index": -1}
 }

@@ -3,12 +3,50 @@ const Lobbies = require('./lobbies')
 const Playermngr = require('./playermngr')
 
 //Lobbies.registerLobby("sexking's lobby","sexking")
+var forEveryoneInLobby = (lobby_index,action) =>
+{
+    for (const player of Lobbies.getLobbyList()[lobby_index].players)
+    {
+        action(player)
+    }
+}
 
+var sendULP = (lobby_index) =>                                                                                      // update lobby participants
+{
+    let lobby_participants = Lobbies.getLobbyPlayersInfo(lobby_index)
+    let msg=lobby_participants.join("/")+"/"
+    forEveryoneInLobby(lobby_index, (player) => {
+        let edited_message = msg.replace(player.name+"?"+player.ready+"/","")
+        edited_message = "ULP|"+edited_message                                     ///ULP|name1?ready1/name2?ready2/name3?ready3 name1 is always host , the host ignores this on gml var global.IAMHOST
+        edited_message=edited_message.slice(0,-1)
+        player.soc.send(edited_message) 
+    })
+}
+
+var disconnectPlayerByWS = (ws) =>
+{
+    let {lobby_index} = Lobbies.findPlayerLobby(  Playermngr.getPlayer(ws)  )
+    if (lobby_index == -1) return //player was not in lobby
+    let was_host = Lobbies.disconnectPlayer(Playermngr.getPlayer(ws))
+    if(was_host)
+    {
+        forEveryoneInLobby(lobby_index, (player) => {
+            player.soc.send("LDH")                                                  ///Lobby disconnect (due to) host
+        })                                                                   
+        Lobbies.unregisterLobby(lobby_index)
+        return
+    }
+    sendULP(lobby_index)
+}
 
 const wss = new WebSocketServer.Server({ port: 6336}, () =>
 {
     console.log("Server listening in on port 6336")
 })
+
+
+
+
 
 wss.on('connection', (ws) => 
 {
@@ -35,25 +73,35 @@ wss.on('connection', (ws) =>
             break
 
             case 'LBD': // lobbies disconnect - request == "LBD"
-                Lobbies.disconnectPlayer(Playermngr.getPlayer(ws))
+            {
+                disconnectPlayerByWS(ws)
+            }
             break
 
             case 'ULP': // update lobby participants
+            {
                 let {lobby_index} = Lobbies.findPlayerLobby(  Playermngr.getPlayer(ws)  )
-                let lobby_participants = Lobbies.getLobbyPlayers(lobby_index)
-                let msg=lobby_participants.join("/")+"/"
-                for (const player of Lobbies.getLobbyList()[lobby_index].players)
-                {
-                    let edited_message = msg.replace(player.name+"/","")
-                    edited_message = edited_message.substring(0,edited_message.length-1)
-                    player.soc.send("ULP|"+edited_message)                                                                     ///ULP|name1/name2/name3 name1 is always host , the host ignores this on gml var global.IAMHOST
-                }
+                sendULP(lobby_index)
+            }
             break
+
+            case 'RDY': //lobby ready
+            {
+                Playermngr.getPlayer(ws).ready = !Playermngr.getPlayer(ws).ready
+                let {lobby_index} = Lobbies.findPlayerLobby(  Playermngr.getPlayer(ws)  )
+                sendULP(lobby_index)
+            }
+            
+
+
+
         }
     })
     ws.on('close', () => 
     {
-        Lobbies.disconnectPlayer(Playermngr.getPlayer(ws))
+        disconnectPlayerByWS(ws)
         Playermngr.unregisterPlayer(ws)
     })
 })
+
+

@@ -6,6 +6,7 @@ class player
     {
         this.soc=soc
         this.name=name
+        this.ready = false
     }
 }
 
