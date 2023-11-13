@@ -56,7 +56,9 @@ wss.on('connection', (ws) =>
         const request = data.toString().split("|")
         switch (request[0])
         {
-            case 'LBS': // get lobbies - request == "LBS|playername"
+            //LOBBY RELATED REQUESTS
+
+            case 'LBS': // get lobbies - request == "LBS"
                 ws.send(Lobbies.generateLobbyList()) //LBS|lobbyname?lobbyhost/lobbyname1?lobbyhost1/...
             break
             
@@ -64,7 +66,7 @@ wss.on('connection', (ws) =>
                 Playermngr.registerPlayer(request[1],ws)
             break
 
-            case 'LBJ': // lobbies join - request == "LBJ|servername"    we need to add them to the players array of the lobby and send to everyone on that lobby the player list
+            case 'LBJ': // lobbies join - request == "LBJ|servername"
                 ws.send("LBJ|"+Lobbies.joinLobby(  Playermngr.getPlayer(ws)  ,request[1])) //LBJ|TRUE or LBJ|FALSE
             break
 
@@ -78,21 +80,37 @@ wss.on('connection', (ws) =>
             }
             break
 
-            case 'ULP': // update lobby participants
+            case 'ULP': // update lobby participants - request == "ULP"
             {
                 let {lobby_index} = Lobbies.findPlayerLobby(  Playermngr.getPlayer(ws)  )
                 sendULP(lobby_index)
             }
             break
 
-            case 'RDY': //lobby ready
+            case 'RDY': //ready (player is ready) - request == "RDY"
             {
                 Playermngr.getPlayer(ws).ready = !Playermngr.getPlayer(ws).ready
                 let {lobby_index} = Lobbies.findPlayerLobby(  Playermngr.getPlayer(ws)  )
                 sendULP(lobby_index)
             }
-            
+            break
 
+            case 'SRT': //start (the game) - request == "SRT"
+            {
+                let {lobby_index} = Lobbies.findPlayerLobby(  Playermngr.getPlayer(ws)  )
+                let everyone_is_ready = true
+                forEveryoneInLobby(lobby_index, (player) => {
+                    if (player.soc == ws ) {}
+                    else if (player.ready == false ) {everyone_is_ready=false;return;} // for the host
+                })
+                forEveryoneInLobby(lobby_index, (player) => {
+                    player.soc.send("SRT")   //SRT (moves to game room)
+                })
+                
+            }   
+            break
+
+            //IN-GAME REQUEST
 
 
         }

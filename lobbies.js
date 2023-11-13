@@ -22,6 +22,12 @@ module.exports.getLobbyList = () =>
     return lobby_list
 }
 
+module.exports.getLobbyHost = (lobby_index) =>
+{
+    return lobby_list[lobby_index].players[0]
+}
+
+
 module.exports.getLobbyPlayersInfo = (lobby_index) =>
 {
     return lobby_list[lobby_index].players.map(function(a) {return a.name+"?"+a.ready;})
