@@ -15,27 +15,39 @@ class lobby
     }
 
 }
+
+class player
+{
+    constructor(name,soc)
+    {
+        this.soc=soc
+        this.name=name
+        this.ready = false
+    }
+}
+
 lobby_list = []
+playersOnline = []
 
-module.exports.getLobbyList = () =>
+module.exports.generateLobbyList = () =>      //LBS|lobbyname?lobbyhost/lobbyname1?lobbyhost1/...
 {
-    return lobby_list
+    msg="LBS|"
+    for (const lob of lobby_list)
+    {
+        msg+=lob.name+"?"+lob.players[0].name+"/"
+    }
+    msg=msg.slice(0,-1) //removes last /
+    return msg
 }
 
-module.exports.getLobbyHost = (lobby_index) =>
+module.exports.registerPlayer = (name,soc) =>
 {
-    return lobby_list[lobby_index].players[0]
+    playersOnline.push(new player(name,soc))
 }
 
-
-module.exports.getLobbyPlayersInfo = (lobby_index) =>
+module.exports.getPlayer = (soc) => //for players not in a lobby
 {
-    return lobby_list[lobby_index].players.map(function(a) {return a.name+"?"+a.ready;})
-}
-
-module.exports.getLobbyPlayersObject = (lobby_index) =>
-{
-    return lobby_list[lobby_index].players.map(function(a) {return a;})
+    return playersOnline.find((player) => player.soc==soc)
 }
 
 module.exports.joinLobby = (player,req_lobby_name) =>
@@ -50,28 +62,41 @@ module.exports.joinLobby = (player,req_lobby_name) =>
     return false
 }
 
+
+module.exports.findLobbyAndPlayer = (ws) =>  //for players inside a lobby
+{
+    for (const _lobby in lobby_list)
+    {
+        for(const _player in lobby_list[_lobby].players)
+        {
+            if (lobby_list[_lobby].players[_player].soc == ws) return {_lobby,_player}
+        }
+    }
+    return {"_lobby": -1}
+}
+
+module.exports.getLobbiesPlayers = (_lobby,_player) =>
+{
+    if (_player == undefined) {return lobby_list[_lobby]}
+    return lobby_list[_lobby].players[_player]
+}
+
 module.exports.registerLobby = (name,host) =>
 {
     lobby_list.push(new lobby(name,host))
 }
 
-module.exports.generateLobbyList = () =>      //LBS|lobbyname?lobbyhost/lobbyname1?lobbyhost1/...
-{
-    msg="LBS|"
-    for (const lob of lobby_list)
+module.exports.sendULP = (lobby) =>                                                                                      // update lobby participants
+{   
+    let pl = lobby.players.map(function(a) {return a.name+"?"+a.ready;})
+    let msg=pl.join("/")+"/"
+    for (const player of lobby.players)
     {
-        msg+=lob.name+"?"+lob.players[0].name+"/"
+        let edited_message = msg.replace(player.name+"?"+player.ready+"/","")
+        edited_message = "ULP|"+edited_message                                     ///ULP|name1?ready1/name2?ready2/name3?ready3 name1 is always host , the host ignores this on gml var global.IAMHOST
+        edited_message=edited_message.slice(0,-1)
+        player.soc.send(edited_message) 
     }
-    msg=msg.slice(0,-1) //removes last /
-    return msg
-}
-
-module.exports.disconnectPlayer = (player) =>
-{
-    let {lobby_index,player_index} = module.exports.findPlayerLobby(player)
-    lobby_list[lobby_index].players.splice(player_index,1)
-    if (player_index==0) return true //if I was host
-    return false
 }
 
 module.exports.unregisterLobby = (lobby_index) =>
@@ -79,17 +104,27 @@ module.exports.unregisterLobby = (lobby_index) =>
     lobby_list.splice(lobby_index,1)
 }
 
-module.exports.findPlayerLobby = (player_given) =>
+module.exports.unregisterPlayer = (soc) =>
 {
-    for ( let lobby_index in lobby_list)
-    {
-        for (let player_index in  lobby_list[lobby_index].players)
+    let player_index=playersOnline.findIndex( (iterated) => iterated.soc == soc)
+    playersOnline.splice(player_index,1)
+}
+
+module.exports.disconnectPlayer = (ws) =>
+{
+    let {_lobby,_player} = module.exports.findLobbyAndPlayer(ws)
+    if (_lobby == -1) return //above found nothing
+    module.exports.getLobbiesPlayers(_lobby,_player).ready = false
+    module.exports.getLobbiesPlayers(_lobby).players.splice(_player,1)
+    if (_player==0) //was host
+    { 
+        for (player of module.exports.getLobbiesPlayers(_lobby).players)
         {
-            if (lobby_list[lobby_index].players[player_index] == player_given)
-            {
-                return {lobby_index,player_index}
-            }
-        }
+            player.ready=false
+            player.soc.send("LDH")
+        } 
+        module.exports.unregisterLobby(_lobby)
+        return
     }
-    return {"lobby_index": -1}
+    module.exports.sendULP(module.exports.getLobbiesPlayers(_lobby))
 }
