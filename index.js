@@ -97,11 +97,7 @@ wss.on('connection', (ws) =>
                     {
                         if(participant.board==undefined) return
                     }
-                    for (const participant of Game.getGamesParticipants(_game).participants)
-                    {
-                        participant.soc.send(Game.eorState(_game))
-                    }
-                    
+                    Game.eorState(_game)
                 }
             break
 

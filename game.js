@@ -44,7 +44,27 @@ module.exports.getGamesParticipants = (_game,_participant) =>
     return games[_game].participants[_participant]
 }
 
-module.exports.eorState = (_game) => //eor = end of round
+sendTimedMessage = (participant,seconds,message) =>
+{
+    return new Promise ((resolve) =>
+    {
+        let intID = setInterval(() => 
+        {
+            if (seconds == 0)
+            {  
+                clearInterval(intID)
+                participant.soc.send(message)
+                resolve()
+                return
+            } 
+            participant.soc.send("TMM|"+seconds)
+            seconds--
+        }, 1000)
+    })
+    
+}
+
+module.exports.eorState = async (_game) => //eor = end of round
 {
     let msg = "EOR|"
     for (const part of games[_game].participants)
@@ -52,7 +72,15 @@ module.exports.eorState = (_game) => //eor = end of round
         msg+=part.board+"?"+part.gold+"?"+part.hp+"/"
     }
     msg=msg.slice(0,-1)
-    return msg
+    for (const part of games[_game].participants)
+    {
+        part.soc.send(msg)
+        sendTimedMessage (part,10,"GOR").then(() =>
+        {
+            console.log("They be goring") // here continue with the play phase, something like sendTimedMessage(part,30,"STP")
+            
+        })
+    }
 }
 
 
