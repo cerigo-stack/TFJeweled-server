@@ -89,10 +89,12 @@ wss.on('connection', (ws) =>
                 }
             break
 
-            case "INI":  //initial gameinfo - request == "INI|board"
+            case "CBS":  //current board state - request == "CBS|board?score" - only after combat rounds
                 {
                     let  {_game,_participant} = Game.findGameAndParticipant(ws)
-                    Game.getGamesParticipants(_game,_participant).board=request[1]
+                    const req_params = request[1].split('?')
+                    Game.getGamesParticipants(_game,_participant).board=req_params[0]
+                    Game.getGamesParticipants(_game,_participant).score=req_params[1]
                     for (const participant of Game.getGamesParticipants(_game).participants)
                     {
                         if(participant.board==undefined) return
