@@ -31,7 +31,7 @@ playersOnline = []
 
 module.exports.generateLobbyList = () =>      //LBS|lobbyname?lobbyhost/lobbyname1?lobbyhost1/...
 {
-    msg="LBS|"
+    let msg="LBS|"
     for (const lob of lobby_list)
     {
         msg+=lob.name+"?"+lob.players[0].name+"/"

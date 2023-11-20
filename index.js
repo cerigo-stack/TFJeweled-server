@@ -99,7 +99,19 @@ wss.on('connection', (ws) =>
                     {
                         if(participant.board==undefined) return
                     }
-                    Game.eorState(_game)
+                    Game.eorState(_game,false)
+                }
+            break
+
+            case "NXR": //debug continue without board update - placeholder for shop and carousel
+                {
+                    let  {_game,_participant} = Game.findGameAndParticipant(ws)
+                    Game.getGamesParticipants(_game,_participant).ended_special_round=true
+                    for (const participant of Game.getGamesParticipants(_game).participants)
+                    {
+                        if(!participant.ended_special_round) return
+                    }
+                    Game.eorState(_game,true)
                 }
             break
 

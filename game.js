@@ -1,14 +1,21 @@
+//debug shit
+const ROUND_TIMER=10
+const PAUSE_TIMER=5
+const FORCE_CAROUSEL=true
+const FORCE_SHOP=false
+
 class game_participant
 {
     constructor (lobby_participant)
     {
         this.gold = 0
-        this.board = ""
+        this.board = undefined
         this.cards = []
         this.score = 0
         this.hp = 100
         this.soc=lobby_participant.soc
         this.name=lobby_participant.name
+        this.ended_special_round=false
     }
 }
 
@@ -18,7 +25,7 @@ class game
     {
         this.participants = []
         this.special_round = 'GOS'
-        this.round=0
+        this.round=-1
         for (const lobby_participant of lobby.players) {this.participants.push(new game_participant(lobby_participant))}
     }
 
@@ -27,8 +34,10 @@ class game
         this.round=++this.round%4
         switch (this.round)
         {
-            case 0:  //special round and set next special round
-                return this.special_round=Math.random()>0.66? "GOS|C": "GOS|S"
+            case 3:  //special round and set next special round
+            if (FORCE_CAROUSEL) return "GOS|C"
+            if (FORCE_SHOP) return "GOS|S"
+            return this.special_round=Math.random()>0.66? "GOS|C": "GOS|S"
             default:
                 return 'GOC' //combat round
         }
@@ -79,22 +88,34 @@ sendTimedMessage = (participant,seconds,message) =>
     
 }
 
-module.exports.eorState = async (_game) => //eor = end of round (THIS IS REALLY UGLY AND WILL NEED TO BE REWRITTEN)
+module.exports.eorState = async (_game,nxr) => //eor = end of round (THIS IS REALLY UGLY AND WILL NEED TO BE REWRITTEN)
 {
-    let msg = "EOR|"
-    for (const part of games[_game].participants)
+    let msg=""
+    if (nxr)
     {
-        msg+=part.board+"?"+part.gold+"?"+part.hp+"/"
-        part.board=undefined
+        msg+="NXR"
+        for (const part of games[_game].participants)
+        {
+            part.ended_special_round=false
+        }
     }
-    msg=msg.slice(0,-1)
+    else
+    {
+        msg+="EOR|"
+        for (const part of games[_game].participants)
+        {
+            msg+=part.board+"?"+part.gold+"?"+part.hp+"/"
+            part.board=undefined
+        }
+        msg=msg.slice(0,-1)
+    }
     let round_after_msg = games[_game].nextRound()
     for (const part of games[_game].participants)
     {
         part.soc.send(msg)
-        sendTimedMessage (part,10,round_after_msg).then(() =>
+        sendTimedMessage (part,PAUSE_TIMER,round_after_msg).then(() =>
         {
-            sendTimedMessage(part,30,"STP")        
+            sendTimedMessage(part,ROUND_TIMER,"STP")        
         })
     }
 }
