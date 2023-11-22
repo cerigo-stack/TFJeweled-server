@@ -16,6 +16,7 @@ class game_participant
         this.soc=lobby_participant.soc
         this.name=lobby_participant.name
         this.ended_special_round=false
+        this.placement=undefined
     }
 }
 
@@ -23,6 +24,7 @@ class game
 {
     constructor (lobby)
     {
+        this.damage_multiplier=1
         this.participants = []
         this.special_round = 'GOS'
         this.round=-1
@@ -35,6 +37,7 @@ class game
         switch (this.round)
         {
             case 3:  //special round and set next special round
+            this.damage_multiplier++
             if (FORCE_CAROUSEL) return "GOS|C"
             if (FORCE_SHOP) return "GOS|S"
             return this.special_round=Math.random()>0.66? "GOS|C": "GOS|S"
@@ -88,10 +91,55 @@ sendTimedMessage = (participant,seconds,message) =>
     
 }
 
+const customQuickSort = (arr) => {
+    if (arr.length <= 1) {
+      return arr;
+    }
+  
+    let pivot = arr[0];
+    let leftArr = [];
+    let rightArr = [];
+  
+    for (let i = 1; i < arr.length; i++) {
+      if (arr[i][1] < pivot[1]) {
+        leftArr.push(arr[i]);
+      } else {
+        rightArr.push(arr[i]);
+      }
+    }
+  
+    return [...customQuickSort(leftArr), pivot, ...customQuickSort(rightArr)];
+};
+  
+handleCombatRound = (game) => //can probably be optimized a lot
+{
+    let score_array = []
+    for (const _part in  game.participants)
+    {
+        score_array.push([_part,game.participants[_part].score])
+    }
+    score_array = customQuickSort(score_array)
+    score_array.reverse()
+    game.participants[score_array[0][0]].placement=1
+    let last_damage=0
+    for (let i=1;i<score_array.length;i++)
+    {
+        if(game.participants[score_array[i][0]].score == game.participants[score_array[i-1][0]].score)
+        {
+            game.participants[score_array[i][0]].placement = game.participants[score_array[i-1][0]].placement
+            game.participants[score_array[i][0]].hp-=last_damage
+            continue
+        }
+        game.participants[score_array[i][0]].placement=i+1
+        if (game.participants[score_array[i][0]].placement > score_array.length>>1) game.participants[score_array[i][0]].hp-=last_damage+game.damage_multiplier
+    }
+
+}
+
 module.exports.eorState = async (_game,nxr) => //eor = end of round (THIS IS REALLY UGLY AND WILL NEED TO BE REWRITTEN)
 {
     let msg=""
-    if (nxr)
+    if (nxr) //AFTER SPECIAL ROUND
     {
         msg+="NXR"
         for (const part of games[_game].participants)
@@ -99,12 +147,13 @@ module.exports.eorState = async (_game,nxr) => //eor = end of round (THIS IS REA
             part.ended_special_round=false
         }
     }
-    else
+    else //AFTER NORMAL ROUND
     {
         msg+="EOR|"
+        handleCombatRound(games[_game])
         for (const part of games[_game].participants)
         {
-            msg+=part.board+"?"+part.gold+"?"+part.hp+"/"
+            msg+=part.board+"?"+part.gold+"?"+part.hp+"?"+part.placement+"?"+part.score+"/"
             part.board=undefined
         }
         msg=msg.slice(0,-1)
