@@ -111,11 +111,13 @@ const customQuickSort = (arr) => {
     return [...customQuickSort(leftArr), pivot, ...customQuickSort(rightArr)];
 };
   
-handleCombatRound = (game) => //can probably be optimized a lot
+handleCombatRound = (game) => //can probably be optimized a lot - handles placements, hp loss and income
 {
     let score_array = []
     for (const _part in  game.participants)
     {
+        game.participants[_part].gold+=Math.floor(game.participants[_part].gold*0.1) //interest
+        game.participants[_part].gold+=6 * (game.round>=0) //every round income = 5 + 1 if not taking damage (here 6 -1 for taking damage)
         score_array.push([_part,game.participants[_part].score])
     }
     score_array = customQuickSort(score_array)
@@ -131,7 +133,11 @@ handleCombatRound = (game) => //can probably be optimized a lot
             continue
         }
         game.participants[score_array[i][0]].placement=i+1
-        if (game.participants[score_array[i][0]].placement > score_array.length>>1) game.participants[score_array[i][0]].hp-=last_damage+game.damage_multiplier
+        if (game.participants[score_array[i][0]].placement > score_array.length>>1)
+        {
+            game.participants[score_array[i][0]].hp-=last_damage+game.damage_multiplier
+            game.participants[score_array[i][0]].gold-=1
+        }
     }
 
 }
