@@ -115,6 +115,28 @@ wss.on('connection', (ws) =>
                 }
             break
 
+            case "CRD": //cards
+                {
+                    let  {_game,_participant} = Game.findGameAndParticipant(ws)
+                    Game.sendCards(_game,_participant)
+                }
+            break
+
+            case "BUY": //player buys a card - request == BUY|cardcode
+                {
+                    let  {_game,_participant} = Game.findGameAndParticipant(ws)
+                    Game.getGamesParticipants(_game).card_purchase(_participant,request[1])
+                }
+            break
+
+            case "RRL": //reroll, costs 2 gold
+                {
+                    let  {_game,_participant} = Game.findGameAndParticipant(ws)
+                    Game.getGamesParticipants(_game,_participant).gold-=2
+                    Game.getGamesParticipants(_game).discard_cards(_participant)
+                    Game.sendCards(_game,_participant)
+                }
+            break
         }
     })
     ws.on('close', () => 

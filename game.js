@@ -1,8 +1,8 @@
 //debug shit
 const ROUND_TIMER=10
 const PAUSE_TIMER=5
-const FORCE_CAROUSEL=true
-const FORCE_SHOP=false
+const FORCE_CAROUSEL=false
+const FORCE_SHOP=true
 
 class game_participant
 {
@@ -11,6 +11,7 @@ class game_participant
         this.gold = 0
         this.board = undefined
         this.cards = []
+        this.sent_cards=[]
         this.score = 0
         this.hp = 100
         this.soc=lobby_participant.soc
@@ -22,15 +23,65 @@ class game_participant
 
 class game 
 {
+    initCards = () =>
+    {
+        const cards_json= require("./cards.json")
+        for (let i=0;i<cards_json.length;i++)
+        {
+            for (let j=0;j<cards_json[i].in_pool;j++)
+            {
+                this.cards.push(cards_json[i].code+"?"+cards_json[i].price)
+            }
+        }
+    }
+
     constructor (lobby)
     {
         this.damage_multiplier=1
         this.participants = []
         this.special_round = 'GOS'
         this.round=-1
+        this.cards=[]
+        this.initCards()
         for (const lobby_participant of lobby.players) {this.participants.push(new game_participant(lobby_participant))}
     }
 
+    draw_cards = (_participant) =>
+    {
+        let msg=""
+        for (let i=0;i<3;i++)
+        {
+            let card_chosen=Math.floor(Math.random() * this.cards.length)
+            this.participants[_participant].sent_cards.push(this.cards[card_chosen])
+            msg+=this.cards[card_chosen]+"/"
+            this.cards.splice(card_chosen,1)
+        }
+        msg=msg.slice(0,-1)
+        return msg 
+    }
+ 
+    discard_cards = (_participant) =>
+    {
+        for (let i=this.participants[_participant].sent_cards.length-1;i>-1;i--)
+        {
+            this.cards.push( this.participants[_participant].sent_cards[i])
+            this.participants[_participant].sent_cards.pop()
+        }
+    }
+
+    card_purchase = (_participant,card) =>
+    {
+        this.participants[_participant].cards.push(card)
+        this.participants[_participant].gold-=card.split('?')[1]
+        this.participants[_participant].sent_cards.splice( this.participants[_participant].sent_cards.indexOf(card) ,1)
+    }
+
+    card_sale = (_participant,card) =>
+    {
+        this.participants[_participant].cards.splice(  this.participants[_participant].cards.indexOf(card),1)
+        this.cards.push(card)
+    }
+    
     nextRound = () => //changes round and returns the round type
     {
         this.round=++this.round%4
@@ -65,7 +116,7 @@ module.exports.findGameAndParticipant = (ws) =>
     }
 }
 
-module.exports.getGamesParticipants = (_game,_participant) =>
+module.exports.getGamesParticipants = (_game,_participant) => //returns game or participant,depends on if _participant is provided
 {
     if (_participant == undefined) {return games[_game]}
     return games[_game].participants[_participant]
@@ -147,10 +198,18 @@ module.exports.eorState = async (_game,nxr) => //eor = end of round (THIS IS REA
     let msg=""
     if (nxr) //AFTER SPECIAL ROUND
     {
-        msg+="NXR"
-        for (const part of games[_game].participants)
+        msg+="NXR|"
+        for (const _participant in games[_game].participants)
         {
-            part.ended_special_round=false
+            games[_game].discard_cards(_participant)
+            msg+= games[_game].participants[_participant].gold+"?"
+            for (card of games[_game].participants[_participant].cards)
+            {
+                msg+=card.split("?")[0]+"?"
+            }
+            msg=msg.slice(0,-1)
+            msg+="/"
+            games[_game].participants[_participant].ended_special_round=false
         }
     }
     else //AFTER NORMAL ROUND
@@ -162,8 +221,8 @@ module.exports.eorState = async (_game,nxr) => //eor = end of round (THIS IS REA
             msg+=part.board+"?"+part.gold+"?"+part.hp+"?"+part.placement+"?"+part.score+"/"
             part.board=undefined
         }
-        msg=msg.slice(0,-1)
     }
+    msg=msg.slice(0,-1)
     let round_after_msg = games[_game].nextRound()
     for (const part of games[_game].participants)
     {
@@ -175,4 +234,8 @@ module.exports.eorState = async (_game,nxr) => //eor = end of round (THIS IS REA
     }
 }
 
-
+module.exports.sendCards = (_game,_participant) =>
+{
+    let cards_message=games[_game].draw_cards(_participant)
+    games[_game].participants[_participant].soc.send("CRD|"+cards_message)
+}
